@@ -75,6 +75,10 @@ if (DELTAFS)
 endif ()
 
 add_executable (geriatrix ${geriatrix-drivers} src/geriatrix.cpp)
+
+# link geriatrix with src/fio/lib/rand.o and src/fio/lib/pattern.o in top directory
+set (geriatrix-depends ${geriatrix-depends} ${CMAKE_SOURCE_DIR}/fio/lib/rand.o ${CMAKE_SOURCE_DIR}/fio/lib/pattern.o ${CMAKE_SOURCE_DIR}/fio/lib/strntol.o)
+
 target_link_libraries (geriatrix ${geriatrix-depends})
 
 install (TARGETS geriatrix RUNTIME DESTINATION bin)

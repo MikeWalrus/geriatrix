@@ -8,6 +8,7 @@
  */
 
 #include "geriatrix.h"
+#include <list>
 
 #ifdef NEED_POSIX_FALLOCATE
 /*
