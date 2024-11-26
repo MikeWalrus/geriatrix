@@ -1033,7 +1033,8 @@ void usage() {
   std::cout << "        -c <confidence fraction between 0 and 1>" << std::endl;
   std::cout << "        -q <0 / 1 ask before quitting>" << std::endl;
   std::cout << "        -w <num mins>" << std::endl;
-  std::cout << "        -b <backend (posix, deltafs, etc.)>" << std::endl;
+  std::cout << "        -b <backend (posix, deltafs, rand)>" << std::endl;
+  std::cout << "        --compress_percentage <int> (for rand backend)" << std::endl;
   std::cout << std::endl;
 }
 
@@ -1094,8 +1095,13 @@ void handler(int signo){
   exit(0);
 }
 
+static struct option long_options[] = {
+    {"compress_percentage", required_argument, 0, 0},
+    {0, 0, 0, 0}
+};
+
 int main(int argc, char *argv[]) {
-  if(argc != 37) {
+  if(argc < 37) {
     usage();
     exit(1);
   }
@@ -1103,34 +1109,47 @@ int main(int argc, char *argv[]) {
   //uint64_t total_disk_capacity = 0;
   double utilization = 0.0;
   int seed = 0;
-  int option = 0;
   int concurrency = 0;
   int idle_injections = 0;
   int query_before_quitting = 0;
   int compress_percentage = 40;
-  while((option = getopt(argc, argv,
-                         "n:u:r:m:a:s:d:x:y:z:t:i:f:p:c:q:w:b:")) != EOF) {
-    switch(option) {
-      case 'n': total_disk_capacity = strtoull(optarg, NULL, 10); break;
-      case 'u': utilization = strtod(optarg, NULL); break;
-      case 'r': seed = atoi(optarg); break;
-      case 'm': mount_point = optarg; break;
-      case 'a': a.in_file = optarg; break;
-      case 's': s.in_file = optarg; break;
-      case 'd': d.in_file = optarg; break;
-      case 'x': a.out_file = optarg; break;
-      case 'y': s.out_file = optarg; break;
-      case 'z': d.out_file = optarg; break;
-      case 't': concurrency = atoi(optarg); break;
-      case 'i': runs = atoi(optarg); break;
-      case 'f': fake = atoi(optarg); break;
-      case 'p': idle_injections = atoi(optarg); break;
-      case 'c': confidence = strtod(optarg, NULL); break;
-      case 'q': query_before_quitting = atoi(optarg); break;
-      case 'w': runtime_max = atoi(optarg); break;
-      case 'b': mybackend = optarg; break;
-    }
+
+  
+  int option_index = 0;
+  int option;
+
+  while((option = getopt_long(argc, argv, "n:u:r:m:a:s:d:x:y:z:t:i:f:p:c:q:w:b:", long_options, &option_index)) != -1) {
+      switch(option) {
+        case 'n': total_disk_capacity = strtoull(optarg, NULL, 10); break;
+        case 'u': utilization = strtod(optarg, NULL); break;
+        case 'r': seed = atoi(optarg); break;
+        case 'm': mount_point = optarg; break;
+        case 'a': a.in_file = optarg; break;
+        case 's': s.in_file = optarg; break;
+        case 'd': d.in_file = optarg; break;
+        case 'x': a.out_file = optarg; break;
+        case 'y': s.out_file = optarg; break;
+        case 'z': d.out_file = optarg; break;
+        case 't': concurrency = atoi(optarg); break;
+        case 'i': runs = atoi(optarg); break;
+        case 'f': fake = atoi(optarg); break;
+        case 'p': idle_injections = atoi(optarg); break;
+        case 'c': confidence = strtod(optarg, NULL); break;
+        case 'q': query_before_quitting = atoi(optarg); break;
+        case 'w': runtime_max = atoi(optarg); break;
+        case 'b': mybackend = optarg; break;
+        case 0:
+            switch (option_index) {
+                case 0:
+                    compress_percentage = atoi(optarg);
+                    break;
+            }
+            break;
+        default:
+            assert(false);
+      }
   }
+
   if (!mybackend || strcmp(mybackend, "posix") == 0) {
       /* do nothing, posix is the default */
   } else if (strcmp(mybackend, "deltafs") == 0) {
@@ -1141,6 +1160,7 @@ int main(int argc, char *argv[]) {
       exit(1);
 #endif
   } else if (strcmp(mybackend, "rand") == 0) {
+      printf("compress_percentage = %d\n", compress_percentage);
       g_backend = &rand_backend_driver;
       rand_buffer_init(&rand_buf, compress_percentage);
   }
