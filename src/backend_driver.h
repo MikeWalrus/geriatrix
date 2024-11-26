@@ -27,7 +27,7 @@ struct backend_driver {
     int (*bd_access)(const char *path, int mode);
     int (*bd_unlink)(const char *path);
     int (*bd_mkdir)(const char *path, mode_t mode);
-    int (*bd_fallocate)(int fd, off_t offset, off_t len);
+    int (*bd_fill_file)(int fd, off_t offset, off_t len);
     int (*bd_stat)(const char *path, struct stat *st);
     int (*bd_chmod)(const char *path, mode_t mode);
 };

@@ -9,6 +9,11 @@
 
 #include "geriatrix.h"
 #include <list>
+#include <cassert>
+
+extern "C" {
+#include "../fio/lib/rand.h"
+}
 
 #ifdef NEED_POSIX_FALLOCATE
 /*
@@ -57,6 +62,70 @@ static int posix_fallocate(int fd, off_t offset, off_t len) {
 /* posix driver (the default) */
 static struct backend_driver posix_backend_driver = {
     open, close, write, access, unlink, mkdir, posix_fallocate, stat, chmod,
+};
+
+const size_t BUF_SIZE = 16 * 1024;
+
+struct rand_buffer {
+    struct frand_state state;
+    char buf[BUF_SIZE];
+    size_t consumed;
+    int percentage;
+};
+
+static struct rand_buffer rand_buf;
+
+static void rand_buffer_fill(struct rand_buffer *buf) {
+    char pattern[] = "deadbeef";
+    size_t segment = 512;
+    for (size_t start = 0; start < BUF_SIZE; start += segment) {
+        fill_random_buf_percentage(
+            &buf->state,
+            &buf->buf[start],
+            buf->percentage,
+            segment,
+            segment,
+            pattern,
+            sizeof(pattern));
+    }
+    buf->consumed = 0;
+}
+
+static void rand_buffer_init(struct rand_buffer *buf, int percentage) {
+    buf->consumed = 0;
+    init_rand(&buf->state, true);
+    buf->percentage = percentage;
+    rand_buffer_fill(buf);
+}
+
+static int rand_fill_file(int fd, off_t offset, off_t len) {
+    while (len > 0) {
+        char *buf_start = &rand_buf.buf[rand_buf.consumed];
+        int n = BUF_SIZE - rand_buf.consumed;
+        if (len < n) {
+            n = len;
+        }
+        int written = write(fd, buf_start, n);
+        assert(written > 0);
+        len -= written;
+        rand_buf.consumed += written;
+        if (rand_buf.consumed == BUF_SIZE) {
+            rand_buffer_fill(&rand_buf);
+        }
+    }
+    return 0;
+}
+
+static struct backend_driver rand_backend_driver = {
+    .bd_open=open,
+    .bd_close=close,
+    .bd_write=write,
+    .bd_access=access,
+    .bd_unlink=unlink,
+    .bd_mkdir=mkdir,
+    .bd_fill_file=rand_fill_file,
+    .bd_stat=stat,
+    .bd_chmod=chmod,
 };
 
 #ifdef DELTAFS     /* optional backend for cmu's deltafs */
@@ -126,7 +195,7 @@ void issueCreate(const char *path, size_t len) {
       if(rv < 0) {
         sleep(1);
       }
-      rv = g_backend->bd_fallocate(fd, 0, len);
+      rv = g_backend->bd_fill_file(fd, 0, len);
     } while(rv != 0);
     if(rv != 0) {
       fprintf(stderr,
@@ -1038,6 +1107,7 @@ int main(int argc, char *argv[]) {
   int concurrency = 0;
   int idle_injections = 0;
   int query_before_quitting = 0;
+  int compress_percentage = 40;
   while((option = getopt(argc, argv,
                          "n:u:r:m:a:s:d:x:y:z:t:i:f:p:c:q:w:b:")) != EOF) {
     switch(option) {
@@ -1070,6 +1140,9 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "error: DELTAFS not enabled in this binary\n");
       exit(1);
 #endif
+  } else if (strcmp(mybackend, "rand") == 0) {
+      g_backend = &rand_backend_driver;
+      rand_buffer_init(&rand_buf, compress_percentage);
   }
 
   assert(total_disk_capacity > 0);
