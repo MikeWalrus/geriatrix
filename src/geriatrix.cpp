@@ -962,7 +962,7 @@ int performRapidAging(size_t till_size, int idle_injections,
 }
 
 int performStableAging(size_t till_size, int idle_injections,
-    struct age *a, struct size *s, struct dir *d, int runs) {
+    struct age *a, struct size *s, struct dir *d, int runs, char *snapshot_cmd, int snapshot_delay) {
   auto future_tick = calculateT(a);
   reAge(a, future_tick);
   int confidence_met = 0;
@@ -974,6 +974,11 @@ int performStableAging(size_t till_size, int idle_injections,
       performOp(false, -1, idle_injections, a, s, d); // delete file
     }
     reAge(a, future_tick);
+
+    if(snapshot_delay && (tick % snapshot_delay) == 0) {
+        int result = system(snapshot_cmd);
+        assert(result == 0 && "snapshot_cmd failed");
+    }
 
     if((tick % 10000) == 0) {
       auto end = std::chrono::high_resolution_clock::now();
@@ -1035,6 +1040,8 @@ void usage() {
   std::cout << "        -w <num mins>" << std::endl;
   std::cout << "        -b <backend (posix, deltafs, rand)>" << std::endl;
   std::cout << "        --compress_percentage <int> (for rand backend)" << std::endl;
+  std::cout << "        --snapshot_cmd <cmd>" << std::endl;
+  std::cout << "        --snapshot_delay <int>" << std::endl;
   std::cout << std::endl;
 }
 
@@ -1097,6 +1104,8 @@ void handler(int signo){
 
 static struct option long_options[] = {
     {"compress_percentage", required_argument, 0, 0},
+    {"snapshot_cmd", required_argument, 0, 0},
+    {"snapshot_delay", required_argument, 0, 0},
     {0, 0, 0, 0}
 };
 
@@ -1113,6 +1122,8 @@ int main(int argc, char *argv[]) {
   int idle_injections = 0;
   int query_before_quitting = 0;
   int compress_percentage = 40;
+  char snapshot_cmd[256] = "echo snapshot_cmd is not set";
+  int snapshot_delay = 0;
 
   
   int option_index = 0;
@@ -1142,6 +1153,12 @@ int main(int argc, char *argv[]) {
             switch (option_index) {
                 case 0:
                     compress_percentage = atoi(optarg);
+                    break;
+                case 1:
+                    strncpy(snapshot_cmd, optarg, 256);
+                    break;
+                case 2:
+                    snapshot_delay = atoi(optarg);
                     break;
             }
             break;
@@ -1187,7 +1204,7 @@ int main(int argc, char *argv[]) {
 
   do {
     performStableAging(total_disk_capacity * runs, idle_injections,
-        &a, &s, &d, runs);
+        &a, &s, &d, runs, snapshot_cmd, snapshot_delay);
   } while(query_before_quitting && resumeAgingQuery(total_disk_capacity,
         runtime));
   handler(0);
