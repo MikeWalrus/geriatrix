@@ -1141,8 +1141,8 @@ int main(int argc, char *argv[]) {
         case 'x': a.out_file = optarg; break;
         case 'y': s.out_file = optarg; break;
         case 'z': d.out_file = optarg; break;
-        case 't': concurrency = strtod(optarg, NULL); break;
-        case 'i': runs = atoi(optarg); break;
+        case 't': concurrency = atoi(optarg); break;
+        case 'i': runs = strtod(optarg, NULL); break;
         case 'f': fake = atoi(optarg); break;
         case 'p': idle_injections = atoi(optarg); break;
         case 'c': confidence = strtod(optarg, NULL); break;
