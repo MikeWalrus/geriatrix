@@ -82,7 +82,7 @@ double goodness_measure = 0.0;
 auto start = std::chrono::high_resolution_clock::now();
 int runtime_max = 0;
 double runtime = 0;
-int runs = 0;
+double runs = 0;
 uint64_t K = 0;
 
 ThreadPool *pool;
